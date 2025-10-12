@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Quiz Builder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    body { margin: 0; background: #0b0f14; color: #e6edf3; }
+    .wrap { max-width: 1100px; margin: 32px auto; padding: 0 16px; }
+    h1 { font-size: 28px; margin: 0 0 16px; }
+    h2 { font-size: 20px; margin: 24px 0 8px; }
+    h3 { font-size: 16px; margin: 12px 0 8px; }
+    .card { background: #0e1621; border: 1px solid #1f2a36; border-radius: 14px; padding: 16px; margin: 12px 0; }
+    input, select, textarea { background: #0b121a; color: #e6edf3; border: 1px solid #243142; border-radius: 10px; padding: 10px 12px; width: 100%; }
+    label { font-size: 13px; color: #a9b6c6; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .btn { background: #2b82f6; border: 0; color: white; padding: 10px 14px; border-radius: 10px; cursor: pointer; }
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+    .btn.small { padding: 6px 10px; font-size: 13px; }
+    .muted { color: #9fb0c2; font-size: 13px; }
+    .list { display: grid; gap: 8px; }
+    .pill { padding: 4px 8px; border-radius: 999px; background: #142033; color: #b9c6d4; font-size: 12px; display: inline-block; }
+    .hr { height: 1px; background: #1f2a36; margin: 16px 0; }
+    .choices li { margin: 6px 0; }
+    .success { color: #58d68d; }
+    .danger { color: #ff6b6b; }
+    .warn { color: #ffb86c; }
+    a { color: #7bb8ff; text-decoration: none; }
+    .flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .right { margin-left: auto; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { text-align:left; padding: 6px 8px; border-bottom:1px solid #1f2a36; font-size: 14px; }
+    th { color:#9fb0c2; font-weight:600; }
+    .hint { font-size: 12px; color: #8aa0b8; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Quiz Builder</h1>
+
+  <!-- Auth -->
+  <div class="card" id="authCard">
+    <h2>1) Авторизация</h2>
+    <div class="row">
+      <div>
+        <label>Имя пользователя</label>
+        <input id="username" placeholder="alice" />
+      </div>
+      <div>
+        <label>Пароль</label>
+        <input id="password" type="password" placeholder="минимум 6 символов" />
+      </div>
+    </div>
+    <div class="flex" style="margin-top:12px">
+      <button class="btn" onclick="register()">Зарегистрироваться</button>
+      <button class="btn" onclick="login()">Войти</button>
+      <button class="btn right" onclick="logout()">Выйти</button>
+      <span class="muted" id="authMsg"></span>
+    </div>
+    <div class="hr"></div>
+    <div class="muted">Токен: <span id="tokenShort" class="pill">—</span></div>
+  </div>
+
+  <!-- Quizzes -->
+  <div class="card" id="quizCard" style="display:none">
+    <h2>2) Квизы</h2>
+    <div class="row">
+      <div>
+        <label>Название квиза</label>
+        <input id="quizTitle" placeholder="Python basics" />
+      </div>
+      <div style="display:flex; align-items:end">
+        <button class="btn" onclick="createQuiz()">Создать квиз</button>
+      </div>
+    </div>
+    <div class="hr"></div>
+    <h3>Мои квизы</h3>
+    <div id="quizList" class="list"></div>
+  </div>
+
+  <!-- Questions -->
+  <div class="card" id="questionCard" style="display:none">
+    <h2>3) Вопросы</h2>
+    <div class="row">
+      <div>
+        <label>Квиз</label>
+        <select id="questionQuiz"></select>
+      </div>
+      <div>
+        <label>Тип вопроса</label>
+        <select id="qType">
+          <option value="single">Один правильный</option>
+          <option value="multiple">Несколько правильных</option>
+          <option value="text">Свободный ответ</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:8px">
+      <label>Текст вопроса</label>
+      <input id="qText" placeholder="Что такое PEP8?" />
+    </div>
+    <div id="choicesBlock" style="margin-top:8px">
+      <label>Варианты (для single/multiple)</label>
+      <div id="choicesHolder"></div>
+      <div class="flex" style="margin-top:8px">
+        <button class="btn small" onclick="addChoice()">+ вариант</button>
+        <span class="hint">Отметьте правильные чекбоксом</span>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <button class="btn" onclick="createQuestion()">Добавить вопрос</button>
+      <span class="muted" id="qMsg"></span>
+    </div>
+    <div class="hr"></div>
+    <div id="questionsList"></div>
+  </div>
+
+  <!-- Play (owner) -->
+  <div class="card" id="playCard" style="display:none">
+    <h2>4) Превью и прохождение (владелец)</h2>
+    <div class="row">
+      <div>
+        <label>Квиз</label>
+        <select id="playQuiz"></select>
+      </div>
+      <div style="display:flex; align-items:end">
+        <button class="btn" onclick="loadPreview()">Открыть превью</button>
+      </div>
+    </div>
+    <div id="previewArea" style="margin-top:12px"></div>
+  </div>
+
+  <!-- Public -->
+  <div class="card" id="publicCard">
+    <h2>5) Публичный режим (без логина)</h2>
+    <div class="row">
+      <div><label>Quiz ID</label><input id="pubQuizId" placeholder="например, 1"></div>
+      <div style="display:flex;align-items:end;gap:8px">
+        <button class="btn" onclick="publicPreview()">Открыть публичное превью</button>
+        <button class="btn" onclick="publicPlay()">Пройти без входа</button>
+      </div>
+    </div>
+    <div id="pubArea" style="margin-top:12px"></div>
+    <div class="hint" style="margin-top:8px">
+      Примечание: для точной проверки без логина фронтенду может не хватить ID вариантов (в публичном превью их нет).
+      Если вы владелец и залогинены, отправка ответов подставит реальные IDs автоматически. В противном случае отправятся индексы —
+      это будет работать, только если сервер поддерживает такую семантику.
+    </div>
+  </div>
+</div>
+
+<script>
+const api = {
+  token: localStorage.getItem('token') || '',
+  headers() {
+    const h = {'Content-Type': 'application/json'};
+    if (this.token) h['Authorization'] = 'Bearer ' + this.token;
+    return h;
+  }
+};
+
+function setToken(t) {
+  api.token = t || '';
+  if (t) localStorage.setItem('token', t); else localStorage.removeItem('token');
+  document.getElementById('tokenShort').textContent = t ? (t.slice(0, 24) + '…') : '—';
+  const show = !!t;
+  document.getElementById('quizCard').style.display = show ? 'block' : 'none';
+  document.getElementById('questionCard').style.display = show ? 'block' : 'none';
+  document.getElementById('playCard').style.display = show ? 'block' : 'none';
+  document.getElementById('authMsg').textContent = '';
+  if (show) refreshQuizzes(); else clearUI();
+}
+setToken(api.token);
+
+function explainError(body) {
+  try {
+    if (body?.error?.details && Array.isArray(body.error.details) && body.error.details.length) {
+      const msgs = body.error.details.map(e => `${(e.loc||[]).join('.')}: ${e.msg}`).join('; ');
+      return `${body.error.message} — ${msgs}`;
+    }
+    return body?.error?.message || 'error';
+  } catch { return 'error'; }
+}
+
+// --- auth ---
+async function register() {
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value;
+  const r = await fetch('/api/v1/auth/register', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username:u, password:p})
+  });
+  const body = await r.json();
+  document.getElementById('authMsg').textContent = r.ok ? 'OK' : explainError(body);
+}
+async function login() {
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value;
+  const r = await fetch('/api/v1/auth/login', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username:u, password:p})
+  });
+  const body = await r.json();
+  if (r.ok) setToken(body.access_token);
+  document.getElementById('authMsg').textContent = r.ok ? 'Вход выполнен' : explainError(body);
+}
+function logout() { setToken(''); }
+
+// --- quizzes ---
+async function createQuiz() {
+  const title = document.getElementById('quizTitle').value.trim();
+  if (!title) return;
+  const r = await fetch('/api/v1/quizzes', {method:'POST', headers: api.headers(), body: JSON.stringify({title})});
+  const body = await r.json().catch(()=>({}));
+  if (!r.ok) { alert(explainError(body)); return; }
+  document.getElementById('quizTitle').value = '';
+  refreshQuizzes();
+}
+
+async function refreshQuizzes() {
+  const r = await fetch('/api/v1/quizzes', {headers: api.headers()});
+  const arr = r.ok ? await r.json() : [];
+  const list = document.getElementById('quizList'); list.innerHTML = '';
+  const sel1 = document.getElementById('questionQuiz'); sel1.innerHTML = '';
+  const sel2 = document.getElementById('playQuiz'); sel2.innerHTML = '';
+
+  arr.forEach(q => {
+    const div = document.createElement('div'); div.className = 'card';
+    const top = document.createElement('div'); top.className = 'flex';
+    const strong = document.createElement('strong'); strong.textContent = q.title;
+    const pill = document.createElement('span'); pill.className = 'pill'; pill.textContent = '#' + q.id;
+
+    const linkQ = document.createElement('a'); linkQ.href='#'; linkQ.className='muted'; linkQ.textContent='вопросы';
+    linkQ.onclick = ev => { ev.preventDefault(); loadQuestions(q.id); };
+
+    const linkP = document.createElement('a'); linkP.href='#'; linkP.className='muted'; linkP.textContent='превью';
+    linkP.onclick = ev => { ev.preventDefault(); loadPreviewFromList(q.id); };
+
+    const btnRename = document.createElement('button'); btnRename.className='btn small'; btnRename.textContent='Переименовать';
+    btnRename.onclick = async () => {
+      const title = prompt('Новое название', q.title);
+      if (!title) return;
+      const rr = await fetch(`/api/v1/quizzes/${q.id}`, {method:'PATCH', headers: api.headers(), body: JSON.stringify({title})});
+      if (!rr.ok) alert('Ошибка переименования'); else refreshQuizzes();
+    };
+
+    const btnDelete = document.createElement('button'); btnDelete.className='btn small'; btnDelete.textContent='Удалить';
+    btnDelete.onclick = async () => {
+      if (!confirm('Удалить квиз целиком?')) return;
+      const rr = await fetch(`/api/v1/quizzes/${q.id}`, {method:'DELETE', headers: api.headers()});
+      if (!rr.ok) alert('Ошибка удаления'); else refreshQuizzes();
+    };
+
+    const btnResults = document.createElement('button'); btnResults.className='btn small'; btnResults.textContent='Результаты';
+    btnResults.onclick = () => loadResults(q.id);
+
+    top.append(strong, pill, linkQ, linkP, btnRename, btnDelete, btnResults);
+    div.appendChild(top);
+    list.appendChild(div);
+
+    const o1 = document.createElement('option'); o1.value = q.id; o1.textContent = `#${q.id} — ${q.title}`; sel1.appendChild(o1);
+    const o2 = document.createElement('option'); o2.value = q.id; o2.textContent = `#${q.id} — ${q.title}`; sel2.appendChild(o2);
+  });
+
+  if (arr.length) { loadQuestions(arr[0].id); }
+}
+
+// --- questions ---
+function addChoiceRow(target) {
+  const row = document.createElement('div');
+  row.className = 'flex';
+  row.innerHTML = `
+    <input placeholder="Вариант ответа" style="flex:1" />
+    <label class="flex" style="gap:6px"><input type="checkbox" /> правильный</label>
+    <button class="btn small" title="Удалить" onclick="this.parentElement.remove()">×</button>`;
+  target.appendChild(row);
+}
+function addChoice() { addChoiceRow(document.getElementById('choicesHolder')); }
+
+document.getElementById('qType').addEventListener('change', (e) => {
+  document.getElementById('choicesBlock').style.display = e.target.value === 'text' ? 'none' : 'block';
+});
+
+async function createQuestion() {
+  const quiz_id = parseInt(document.getElementById('questionQuiz').value);
+  const type = document.getElementById('qType').value;
+  const text = document.getElementById('qText').value.trim();
+  let choices = null;
+  if (type !== 'text') {
+    const rows = Array.from(document.getElementById('choicesHolder').children);
+    choices = rows.map(r => {
+      const inputs = r.querySelectorAll('input');
+      const value = inputs[0].value.trim();
+      const correct = inputs[1].checked;
+      return {text: value, is_correct: correct};
+    }).filter(c => c.text);
+  }
+  const r = await fetch('/api/v1/questions', {method:'POST', headers: api.headers(), body: JSON.stringify({quiz_id, type, text, choices})});
+  const body = await r.json().catch(()=>({}));
+  const msg = document.getElementById('qMsg');
+  if (!r.ok) { msg.textContent = explainError(body); return; }
+  msg.textContent = 'Добавлено';
+  document.getElementById('qText').value=''; document.getElementById('choicesHolder').innerHTML='';
+  loadQuestions(quiz_id);
+}
+
+async function loadQuestions(quiz_id) {
+  const r = await fetch(`/api/v1/questions?quiz_id=${quiz_id}`, {headers: api.headers()});
+  const arr = r.ok ? await r.json() : [];
+  const box = document.getElementById('questionsList');
+  box.innerHTML = `<h3>Вопросы квиза #${quiz_id}</h3>`;
+  arr.forEach(q => {
+    const c = document.createElement('div'); c.className = 'card';
+    const header = document.createElement('div'); header.className='flex';
+    const strong = document.createElement('strong'); strong.textContent = q.text;
+    const pill = document.createElement('span'); pill.className='pill'; pill.textContent = q.type;
+    header.append(strong, pill); c.appendChild(header);
+
+    if (q.choices && q.choices.length) {
+      const ul = document.createElement('ul'); ul.className='choices';
+      q.choices.forEach(ch => { const li = document.createElement('li'); li.textContent = ch.text; ul.appendChild(li); });
+      c.appendChild(ul);
+    } else {
+      const empty = document.createElement('div'); empty.className='muted'; empty.textContent='без вариантов';
+      c.appendChild(empty);
+    }
+
+    const actions = document.createElement('div'); actions.className='flex';
+    const btnQEdit = document.createElement('button'); btnQEdit.className='btn small'; btnQEdit.textContent='Изменить текст';
+    btnQEdit.onclick = async () => {
+      const newText = prompt('Новый текст вопроса', q.text);
+      if (!newText) return;
+      const rr = await fetch(`/api/v1/questions/${q.id}`, {method:'PATCH', headers: api.headers(), body: JSON.stringify({text: newText})});
+      if (!rr.ok) alert('Ошибка обновления'); else loadQuestions(quiz_id);
+    };
+    const btnQDel = document.createElement('button'); btnQDel.className='btn small'; btnQDel.textContent='Удалить';
+    btnQDel.onclick = async () => {
+      if (!confirm('Удалить вопрос?')) return;
+      const rr = await fetch(`/api/v1/questions/${q.id}`, {method:'DELETE', headers: api.headers()});
+      if (!rr.ok) alert('Ошибка удаления'); else loadQuestions(quiz_id);
+    };
+    actions.append(btnQEdit, btnQDel); c.appendChild(actions);
+
+    box.appendChild(c);
+  });
+  document.getElementById('questionQuiz').value = String(quiz_id);
+  document.getElementById('playQuiz').value = String(quiz_id);
+}
+
+function loadPreviewFromList(id){ document.getElementById('playQuiz').value = String(id); loadPreview(); }
+
+// --- owner preview/submit ---
+async function loadPreview() {
+  const quiz_id = parseInt(document.getElementById('playQuiz').value);
+  const r = await fetch(`/api/v1/quizzes/${quiz_id}/preview`, {headers: api.headers()});
+  const data = r.ok ? await r.json() : null;
+  const area = document.getElementById('previewArea');
+  if (!data) { area.innerHTML = '<div class="danger">Ошибка загрузки превью</div>'; return; }
+  renderPlayForm(area, data, async (answers) => {
+    // owner: у нас есть доступ к /api/v1/questions => подставим реальные choice_id
+    answers = await attachRealChoiceIds(quiz_id, answers, true);
+    const resp = await fetch(`/api/v1/quizzes/${quiz_id}/submit`, {method:'POST', headers: api.headers(), body: JSON.stringify({answers})});
+    return resp;
+  });
+}
+
+// --- results (owner) ---
+async function loadResults(quiz_id) {
+  const r = await fetch(`/api/v1/quizzes/${quiz_id}/results`, {headers: api.headers()});
+  const arr = r.ok ? await r.json() : [];
+  const box = document.getElementById('questionsList');
+  box.innerHTML = `<h3>Результаты квиза #${quiz_id}</h3>`;
+  if (!arr.length) { box.innerHTML += '<div class="muted">Пока нет попыток</div>'; return; }
+  const tbl = document.createElement('table');
+  tbl.innerHTML = '<tr><th>ID</th><th>User</th><th>Score</th><th>When</th></tr>';
+  arr.forEach(v => {
+    const when = new Date(v.created_at * 1000).toLocaleString();
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${v.id}</td><td>${v.user_id ?? 'guest'}</td><td>${v.score}/${v.max_score}</td><td>${when}</td>`;
+    tbl.appendChild(tr);
+  });
+  box.appendChild(tbl);
+}
+
+// --- PUBLIC preview/submit ---
+async function publicPreview() {
+  const id = Number(document.getElementById('pubQuizId').value);
+  if (!id) return;
+  const r = await fetch(`/api/v1/public/quizzes/${id}/preview`);
+  const data = r.ok ? await r.json() : null;
+  const area = document.getElementById('pubArea');
+  if (!data) { area.innerHTML = '<div class="danger">Квиз не найден</div>'; return; }
+  renderPlayForm(area, data, async (answers) => {
+    // попробуем подставить реальные IDs, если у нас есть токен владельца
+    answers = await attachRealChoiceIds(id, answers, false);
+    const resp = await fetch(`/api/v1/public/quizzes/${id}/submit`, {method:'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({answers})});
+    return resp;
+  });
+}
+
+// Идентификаторы вариантов: пробуем подтянуть через приватный /questions, если токен есть.
+// Если не получится — оставим индексы как есть (сервер может проигнорировать).
+async function attachRealChoiceIds(quiz_id, answers, useAuth) {
+  try {
+    const headers = useAuth ? api.headers() : {'Content-Type':'application/json'};
+    if (!useAuth || !api.token) throw new Error('no-auth');
+    const qs = await fetch(`/api/v1/questions?quiz_id=${quiz_id}`, {headers}).then(r => r.ok ? r.json() : Promise.reject());
+    const byQ = {}; qs.forEach(q => byQ[q.id] = (q.choices || []));
+    return answers.map(a => {
+      const map = byQ[a.question_id] || [];
+      if ('choice_id' in a && a.choice_id != null) {
+        const real = map[a.choice_id]; // индекс -> объект
+        return {...a, choice_id: real ? real.id : null};
+      }
+      if ('choice_ids' in a && Array.isArray(a.choice_ids)) {
+        return {...a, choice_ids: a.choice_ids.map(idx => (map[idx] ? map[idx].id : null)).filter(x => x != null)};
+      }
+      return a;
+    });
+  } catch {
+    return answers; // индексы останутся индексами — сервер может не понять без доработок
+  }
+}
+
+// Рендер формы прохождения и обработчик отправки (common для owner/public)
+function renderPlayForm(container, data, submitter) {
+  container.innerHTML = `<h3>${escapeHtml(data.title)}</h3>`;
+  const form = document.createElement('div');
+
+  data.questions.forEach((q, idx) => {
+    const box = document.createElement('div'); box.className = 'card';
+    const header = document.createElement('div'); header.className='flex';
+    const qn = document.createElement('strong'); qn.textContent = `Q${idx+1}.`;
+    const text = document.createElement('div'); text.textContent = q.text;
+    const pill = document.createElement('span'); pill.className='pill'; pill.textContent = q.type;
+    header.append(qn, text, pill);
+    box.appendChild(header);
+
+    if (q.type === 'text') {
+      const inp = document.createElement('input'); inp.placeholder='Ваш ответ';
+      inp.setAttribute('data-q', q.id); inp.setAttribute('data-type', 'text');
+      box.appendChild(inp);
+    } else if (q.type === 'single') {
+      (q.choices || []).forEach((ch, i) => {
+        const label = document.createElement('label'); label.className='flex'; label.style.gap='8px';
+        const radio = document.createElement('input'); radio.type='radio'; radio.name=`q_${q.id}`; radio.value=String(i);
+        radio.setAttribute('data-q', q.id); radio.setAttribute('data-type','single');
+        const span = document.createElement('span'); span.textContent = ch.text;
+        label.append(radio, span); box.appendChild(label);
+      });
+    } else { // multiple
+      (q.choices || []).forEach((ch, i) => {
+        const label = document.createElement('label'); label.className='flex'; label.style.gap='8px';
+        const cb = document.createElement('input'); cb.type='checkbox'; cb.value=String(i);
+        cb.setAttribute('data-q', q.id); cb.setAttribute('data-type','multiple');
+        const span = document.createElement('span'); span.textContent = ch.text;
+        label.append(cb, span); box.appendChild(label);
+      });
+    }
+    form.appendChild(box);
+  });
+
+  const btn = document.createElement('button'); btn.className='btn'; btn.textContent='Отправить ответы';
+  btn.onclick = async () => {
+    const answers = collectAnswers(data);
+    const r = await submitter(answers);
+    const body = await r.json().catch(()=>({}));
+    const node = document.getElementById(container.id === 'previewArea' ? 'submitMsgOwner' : 'submitMsgPublic');
+    if (r.ok) node.innerHTML = `<span class="success">Результат: ${body.score} / ${body.max_score}</span>`;
+    else node.innerHTML = `<span class="danger">${escapeHtml(explainError(body))}</span>`;
+  };
+  form.appendChild(btn);
+
+  const msg = document.createElement('div'); msg.className='muted'; msg.style.marginTop='8px';
+  msg.id = container.id === 'previewArea' ? 'submitMsgOwner' : 'submitMsgPublic';
+  form.appendChild(msg);
+
+  container.appendChild(form);
+}
+
+function collectAnswers(preview) {
+  const answers = [];
+  preview.questions.forEach(q => {
+    if (q.type === 'text') {
+      const inp = document.querySelector(`input[data-q="${q.id}"][data-type="text"]`);
+      answers.push({question_id: q.id, text: inp?.value || ''});
+    } else if (q.type === 'single') {
+      const chosen = document.querySelector(`input[name="q_${q.id}"][data-type="single"]:checked`);
+      answers.push({question_id: q.id, choice_id: chosen ? Number(chosen.value) : null}); // индекс (будет заменён на id)
+    } else {
+      const chosen = Array.from(document.querySelectorAll(`input[data-q="${q.id}"][data-type="multiple"]:checked`));
+      answers.push({question_id: q.id, choice_ids: chosen.map(x => Number(x.value))}); // индексы
+    }
+  });
+  return answers;
+}
+
+function clearUI() {
+  document.getElementById('quizList').innerHTML='';
+  document.getElementById('questionQuiz').innerHTML='';
+  document.getElementById('playQuiz').innerHTML='';
+  document.getElementById('questionsList').innerHTML='';
+  document.getElementById('previewArea').innerHTML='';
+  document.getElementById('pubArea').innerHTML='';
+}
+
+function escapeHtml(s){ return (s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+</body>
+</html>
