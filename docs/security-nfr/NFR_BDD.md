@@ -1,25 +1,32 @@
-# BDD-сценарии для Security NFR
+# NFR — Приёмка (BDD)
 
-Feature: Время ответа логина
-  Scenario: p95 логина держится под порогом
-    Given сервис развернут на stage при нагрузке 50 RPS
-    When запускается 5-минутный нагрузочный тест на POST /login
-    Then p95 времени ответа ≤ 300 ms
+Feature: Единый формат ошибок
+  Scenario: 404 Not Found в контракте ошибок
+    Given сервис запущен
+    When клиент запрашивает GET /items/999
+    Then статус 404 и тело содержит error.code="not_found"
 
-Feature: Доля ошибок API
-  Scenario: Процент 5xx ответов в пределах нормы
-    Given генерируются запросы к /quiz с ошибками
-    When собираются все ответы за 10 минут
-    Then 5xx ответов ≤ 0.5%
+Feature: Валидация входных данных
+  Scenario: 422 Validation Error в контракте ошибок
+    Given сервис запущен
+    When клиент отправляет POST /items с пустым name
+    Then статус 422 и error.code="validation_error" и details не пустой
 
-Feature: Маскирование PII
-  Scenario: Логи не содержат открытые PII
-    Given приложение записывает логи с пользовательскими данными
-    When просматриваются логи файла application.log
-    Then не найдено незамаскированных PII
+Feature: Отсутствие IDOR
+  Scenario: Чужой пользователь не видит чужой квиз
+    Given User A создал quiz #X
+    And User B вошёл в систему
+    When B запрашивает GET /api/v1/quizzes/X
+    Then статус 403 и error.code="forbidden"
 
-Feature: Негативный сценарий перегрузки
-  Scenario: Повышенная нагрузка вызывает деградацию
-    Given нагрузка 200 RPS на stage
-    When запускается 5-минутный тест
-    Then p95 времени ответа > 300 ms
+Feature: JWT TTL
+  Scenario: Токен имеет срок жизни не более 15 минут
+    Given пользователь успешно прошёл логин
+    When клиент декодирует токен без проверки подписи
+    Then поле exp ≤ now()+15min
+
+Feature: Лимит логинов
+  Scenario: Превышение порога попыток логина
+    Given 5 неуспешных попыток логина за последние 60 секунд
+    When выполняется 6-я попытка
+    Then статус 429 и error.code="too_many_requests"
