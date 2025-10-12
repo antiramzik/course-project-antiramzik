@@ -5,9 +5,14 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import JSONResponse
 
+from app.routers import auth as auth_router
+from app.routers import items as items_router
 from app.schemas.item import ItemCreate, ItemRead
 
 app = FastAPI(title="Quiz Builder API", version="0.1.0")
+
+app.include_router(auth_router.router)
+app.include_router(items_router.router)
 
 
 # Кастомные ошибки домена (если пригодятся)
@@ -66,9 +71,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     # На всякий для неожиданных 500
     return JSONResponse(
         status_code=500,
-        content={
-            "error": {"code": "internal_error", "message": "internal server error"}
-        },
+        content={"error": {"code": "internal_error", "message": "internal server error"}},
     )
 
 
