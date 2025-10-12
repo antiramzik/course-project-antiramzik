@@ -1,0 +1,9 @@
+# Глобальный владелец проекта
+*                 @antiramzik @aNd1CE
+
+# Владельцы по компонентам
+src/app/*         @antiramzik
+src/domain/*      @antiramzik
+tests/*           @antiramzik
+docs/*            @antiramzik
+.github/*         @antiramzik @aNd1CE
