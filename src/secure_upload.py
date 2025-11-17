@@ -1,5 +1,5 @@
-from pathlib import Path
 import uuid
+from pathlib import Path
 
 MAX_BYTES = 5_000_000
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
