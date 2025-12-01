@@ -18,7 +18,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [ "3.11", "3.12" ]
+        python-version: ["3.11", "3.12"]
+    env:
+      APP_ENV: test
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      DB_URL: ${{ secrets.DB_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,7 +44,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install ruff black isort pytest
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
 
       - name: Lint (ruff)
         run: ruff check .
@@ -55,7 +59,9 @@ jobs:
         timeout-minutes: 5
 
       - name: Tests
-        run: pytest -q --maxfail=1 --disable-warnings --junitxml=reports/junit.xml
+        run: |
+          mkdir -p reports
+          pytest -q --maxfail=1 --disable-warnings --junitxml=reports/junit-${{ matrix.python-version }}.xml
         timeout-minutes: 10
 
       - name: Upload test reports
@@ -65,15 +71,15 @@ jobs:
           name: reports-${{ matrix.python-version }}
           path: reports/**
 
-  container:
-    runs-on: ubuntu-latest
+  container-security:
     needs: test
-    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Dockerfile lint (hadolint)
+      - name: Lint Dockerfile with Hadolint
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Dockerfile
@@ -86,14 +92,51 @@ jobs:
         uses: aquasecurity/trivy-action@0.26.0
         with:
           image-ref: myapp:${{ github.sha }}
-          format: 'table'
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '0'
-          output: 'trivy-report.txt'
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+          exit-code: 0
+          output: trivy-report.txt
 
       - name: Upload Trivy report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: trivy-image
           path: trivy-report.txt
+
+  deploy-mock:
+    needs: container-security
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image for staging
+        run: docker build -t myapp-staging:${{ github.sha }} .
+
+      - name: Run container
+        run: docker run -d --rm -p 8080:8080 --name myapp-staging myapp-staging:${{ github.sha }}
+
+      - name: Smoke test
+        run: |
+          sleep 5
+          curl -f http://127.0.0.1:8080/ > smoke.txt
+          docker ps > docker-ps.txt
+
+      - name: Stop container
+        if: always()
+        run: docker stop myapp-staging
+
+      - name: Upload deploy log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-log
+          path: |
+            smoke.txt
+            docker-ps.txt
