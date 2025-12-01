@@ -1,20 +1,38 @@
-# Build stage
-FROM python:3.11-slim AS build
-WORKDIR /app
-COPY requirements.txt requirements-dev.txt ./
-RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
-COPY . .
-RUN pytest -q
+# syntax=docker/dockerfile:1.7-labs
+FROM python:3.12-slim AS build
 
-# Runtime stage
-FROM python:3.11-slim
 WORKDIR /app
-RUN useradd -m appuser
-COPY --from=build /usr/local/lib/python3.11 /usr/local/lib/python3.11
-COPY --from=build /usr/local/bin /usr/local/bin
+
+COPY requirements.txt ./
+
+RUN --mount=type=cache,target=/root/.cache \
+    python -m pip install --no-cache-dir --upgrade "pip==25.3" && \
+    python -m pip wheel --no-cache-dir --wheel-dir=/wheels -r requirements.txt
+
+FROM python:3.12-slim AS runtime
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+
+RUN groupadd -r app && useradd -r -g app app
+
+COPY --from=build /wheels /wheels
+
+RUN --mount=type=cache,target=/root/.cache \
+    python -m pip install --no-cache-dir /wheels/* && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY . .
-EXPOSE 8000
-HEALTHCHECK CMD curl -f http://localhost:8000/health || exit 1
-USER appuser
-ENV PYTHONUNBUFFERED=1
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+USER app
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD curl -f http://127.0.0.1:8080/ || exit 1
+
+EXPOSE 8080
+
+CMD ["python", "-m", "http.server", "8080", "--bind", "0.0.0.0"]
