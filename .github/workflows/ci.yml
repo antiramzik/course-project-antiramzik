@@ -19,6 +19,9 @@ jobs:
       fail-fast: false
       matrix:
         python-version: [ "3.11", "3.12" ]
+    env:
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      DB_URL: ${{ secrets.DB_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
