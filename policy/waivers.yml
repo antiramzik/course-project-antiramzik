@@ -1,0 +1,9 @@
+waivers:
+  - id: "GHSA-f96h-pmfr-66vw"
+    package: "starlette"
+    version: "0.38.6"
+    severity: "High"
+    reason: "Транзитивная зависимость; пока нет фикс-версии; компонент не в критичном прод-пути."
+    issue: "https://github.com/antiramzik/course-project-antiramzik/issues/1"
+    expires_at: "2025-12-31"
+    approved_by: "tutor@example.org"
